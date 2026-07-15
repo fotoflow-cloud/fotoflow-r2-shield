@@ -30,9 +30,10 @@ export default {
       console.error("R2 Read Interrupted:", err);
     }
 
-    // 2. Cache Miss: Query the original Google Cloud Storage Bucket
-    // Replace with your exact GCS public bucket URL path setup
-    const gcsUrl = `https://storage.googleapis.com/fotoflow-studio.firebasestorage.app/${objectKey}`;
+    // 2. Cache Miss: Query Firebase Storage via the REST API
+    // Slashes in the path must be encoded as %2F for the Firebase /o/ endpoint
+    const encodedKey = objectKey.split('/').map(encodeURIComponent).join('%2F');
+    const gcsUrl = `https://firebasestorage.googleapis.com/v0/b/fotoflow-studio.firebasestorage.app/o/${encodedKey}?alt=media`;
 
     const gcsResponse = await fetch(gcsUrl);
     if (!gcsResponse.ok) {
