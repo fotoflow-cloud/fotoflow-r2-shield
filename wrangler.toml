@@ -1,4 +1,4 @@
-name = "fotoflow-worker"
+name = "fotoflow-r2-shield"
 main = "src/index.js"
 compatibility_date = "2026-07-15"
 
