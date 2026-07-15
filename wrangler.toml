@@ -1,0 +1,9 @@
+name = "fotoflow-worker"
+main = "src/index.js"
+compatibility_date = "2026-07-15"
+
+# Production configuration defaults to the top level
+
+[env.preview]
+name = "fotoflow-worker-preview"
+# Add preview-specific environment variables here if needed
