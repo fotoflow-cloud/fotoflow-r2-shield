@@ -1,9 +1,16 @@
-name = "fotoflow-r2-shield"
+name = "fotoflow-worker"
 main = "src/index.js"
 compatibility_date = "2026-07-15"
 
-# Production configuration defaults to the top level
+# R2 bucket binding — the worker accesses this as env.R2_SHIELD
+[[r2_buckets]]
+binding = "R2_SHIELD"
+bucket_name = "fotoflow-india-cache-shield-01"
 
+# Preview environment
 [env.preview]
 name = "fotoflow-worker-preview"
-# Add preview-specific environment variables here if needed
+
+[[env.preview.r2_buckets]]
+binding = "R2_SHIELD"
+bucket_name = "fotoflow-india-cache-shield-01"  # or same bucket if you prefer
