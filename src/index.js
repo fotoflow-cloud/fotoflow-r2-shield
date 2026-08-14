@@ -24,6 +24,7 @@ export default {
         const headers = new Headers();
         r2Object.writeHttpMetadata(headers);
         headers.set("X-Cache-Shield", "HIT-R2");
+        headers.set("Cache-Control", "public, max-age=31536000, immutable");
         return new Response(r2Object.body, { headers });
       }
     } catch (err) {
