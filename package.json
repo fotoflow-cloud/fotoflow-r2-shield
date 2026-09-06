@@ -1,13 +1,16 @@
 {
   "name": "fotoflow-r2-shield",
   "version": "1.0.0",
+  "type": "module",
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "deploy:preview": "wrangler deploy --env preview"
+    "deploy:preview": "wrangler deploy --env preview",
+    "test": "node --test test/worker.test.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
   }
 }
+
