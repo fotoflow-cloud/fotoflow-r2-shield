@@ -5,12 +5,57 @@
  * 1. Checks Cloudflare Edge Cache (caches.default).
  * 2. On edge miss, checks R2 Shield Bucket (env.R2_SHIELD).
  *    On R2 hit: serves asset and asynchronously caches at edge.
- * 3. On R2 miss, falls back to Google Cloud Storage (Firebase Storage).
+ * 3. On R2 miss, falls back to Google Cloud Storage (GCS / Firebase Storage).
+ *    Searches across configured candidate buckets sequentially.
  *    On GCS hit: serves asset immediately and asynchronously backfills
  *    both R2 and the Cloudflare edge cache.
  */
 
 const CACHE_CONTROL_IMMUTABLE = "public, max-age=31536000, immutable";
+
+// Default list of buckets to query on R2 miss (searched in order)
+const DEFAULT_BUCKETS = [
+  "fotoflow-india-2",
+  "fotoflow-india-1",
+  "fotoflow-studio.firebasestorage.app"
+];
+
+/**
+ * Builds the appropriate upstream HTTP URL depending on whether the target
+ * is a standard Google Cloud Storage bucket or a Firebase Storage REST API bucket.
+ */
+function buildUpstreamUrl(bucket, objectKey) {
+  if (bucket.includes("firebasestorage.app")) {
+    const encodedKey = objectKey.split("/").map(encodeURIComponent).join("%2F");
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedKey}?alt=media`;
+  }
+  // Standard GCS Public Bucket URL
+  return `https://storage.googleapis.com/${bucket}/${objectKey}`;
+}
+
+/**
+ * Sequentially queries candidate buckets until the requested object is found.
+ */
+async function fetchFromUpstream(objectKey, env) {
+  // Pull from env.GCS_BUCKETS (comma-separated string) if set, otherwise use DEFAULT_BUCKETS
+  const buckets = env.GCS_BUCKETS
+    ? env.GCS_BUCKETS.split(",").map(b => b.trim()).filter(Boolean)
+    : DEFAULT_BUCKETS;
+
+  for (const bucket of buckets) {
+    const url = buildUpstreamUrl(bucket, objectKey);
+    try {
+      const response = await fetch(url, { method: "GET" });
+      if (response.ok) {
+        return response;
+      }
+    } catch (err) {
+      console.error(`Fetch error from upstream bucket (${bucket}):`, err);
+    }
+  }
+
+  return null;
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -106,22 +151,12 @@ export default {
       console.error("R2 Read Interrupted:", err);
     }
 
-    // 4. Cache Miss on both Edge & R2: Query Firebase Storage via the REST API
-    // Slashes in the path must be encoded as %2F for the Firebase /o/ endpoint
-    const encodedKey = objectKey.split("/").map(encodeURIComponent).join("%2F");
-    const gcsUrl = `https://firebasestorage.googleapis.com/v0/b/fotoflow-studio.firebasestorage.app/o/${encodedKey}?alt=media`;
+    // 4. Cache Miss on both Edge & R2: Fetch from Upstream Storage Buckets
+    const gcsResponse = await fetchFromUpstream(objectKey, env);
 
-    let gcsResponse;
-    try {
-      gcsResponse = await fetch(gcsUrl, { method: "GET" });
-    } catch (fetchErr) {
-      console.error("GCS Fetch Error:", fetchErr);
-      return new Response("Upstream storage error.", { status: 502 });
-    }
-
-    if (!gcsResponse.ok) {
+    if (!gcsResponse) {
       return new Response("Asset missing from primary source.", {
-        status: gcsResponse.status
+        status: 404
       });
     }
 
